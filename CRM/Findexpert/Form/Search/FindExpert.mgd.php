@@ -11,8 +11,8 @@ return array (
     'params' => 
     array (
       'version' => 3,
-      'label' => 'FindExpert',
-      'description' => 'FindExpert (nl.pum.findexpert)',
+      'label' => 'Find Expert',
+      'description' => 'PUM Find Expert',
       'class_name' => 'CRM_Findexpert_Form_Search_FindExpert',
     ),
   ),
