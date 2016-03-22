@@ -48,7 +48,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   // property for restriction activity type id
   private $_restrictionsActivityTypeId = NULL;
   private $_scheduledActivityStatusValue = NULL;
-
+  
   /**
    * CRM_Findexpert_Form_Search_FindExpert constructor.
    * @param $formValues
@@ -56,6 +56,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   function __construct(&$formValues) {
     $this->setLanguagesWithLevels();
+    $this->getGenericSkillsList();
     $this->setRequiredCustomTables();
     $this->setRequiredCustomColumns();
 
@@ -112,7 +113,6 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       array('id' => 'expertise_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
     );
 
-    $this->getGenericSkillsList();
     $form->add('select', 'generic_id', ts('Generic Skill(s)'), $this->_genericSkillsList, FALSE,
       array('id' => 'generic_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
     );
@@ -206,20 +206,6 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     }
     asort($result);
     return $result;
-  }
-
-  /**
-   * Get a list of summary data points
-   *
-   * @return mixed; NULL or array with keys:
-   *  - summary: string
-   *  - total: numeric
-   */
-  function summary() {
-    return array(
-      'summary' => 'Total number of experts found that match your criteria',
-      'total' => $this->count()
-      );
   }
 
   /**
@@ -317,15 +303,14 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   private function addCountriesVisitedWhereClause() {
     if (isset($this->_formValues['countries_visited'])) {
-      $countryIndex = array();
+      $clauses = array();
       foreach ($this->_formValues['countries_visited'] as $countryVisitedId) {
         $this->_whereIndex++;
-        $this->_whereParams[$this->_whereIndex] = array(CRM_Core_DAO::VALUE_SEPARATOR.$countryVisitedId.
-          CRM_Core_DAO::VALUE_SEPARATOR, 'String');
-        $countryIndex[] = '%'.$this->_whereIndex;
+        $this->_whereParams[$this->_whereIndex] = array('%'.$countryVisitedId.'%', 'String');
+        $clauses[] = 'wh.'.$this->_whCountriesVisitedColumn.' LIKE %'.$this->_whereIndex;
       }
-      if (!empty($countryIndex)) {
-        $this->_whereClauses[] = '(wh.'.$this->_whCountriesVisitedColumn.' IN('.implode(', ', $countryIndex).'))';
+      if (!empty($clauses)) {
+        $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
       }
     }
   }
@@ -334,7 +319,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * Method to add the overall search string where clause
    */
   private function addOverallSearchWhereClause() {
-    if (isset($this->_formValues['overall_string'])) {
+    if (isset($this->_formValues['overall_string']) && !empty($this->_formValues['overall_string'])) {
       $searchColumns = array($this->_expSideActivitiesColumn, $this->_eduFieldOfStudyColumn, $this->_eduNameInstitutionColumn,
         $this->_whCompetencesUsedColumn, $this->_whDescriptionColumn, $this->_whNameOfOrganizationColumn, $this->_whResponsibilitiesColumn);
       $this->_whereIndex++;
@@ -387,6 +372,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       }
     }
   }
+
   /**
    * Method to add the area of expertise where clauses
    */
@@ -444,7 +430,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
 
   /**
    * Method to check if there are active restrictions for expert
-   * 
+   *
    * @param $contactId
    * @return string
    */
@@ -605,6 +591,9 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereParams[1] = array('%Expert%', 'String');
     $this->_whereClauses[] = '(contact_a.is_deceased = %2)';
     $this->_whereParams[2] = array(0, 'Integer');
-    $this->_whereIndex = 2;
+    $this->_whereClauses[] = '(exp.'.$this->_expStatusColumn.' NOT IN(%3, %4))';
+    $this->_whereParams[3] = array('Exit', 'String');
+    $this->_whereParams[4] = array('Suspended', 'String');
+    $this->_whereIndex = 4;
   }
 }
