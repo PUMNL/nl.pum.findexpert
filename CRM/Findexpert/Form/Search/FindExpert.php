@@ -12,7 +12,9 @@
  */
 class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Custom_Base implements CRM_Contact_Form_Search_Interface {
 
+  // select list that need to be at class level
   private $_languagesWithLevels = array();
+  private $_genericSkillsList = array();
 
   // custom table names needed
   private $_workHistoryCustomGroupTable = NULL;
@@ -34,6 +36,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_llLevelColumn = NULL;
   private $_expStatusColumn = NULL;
   private $_expGenericColumn = NULL;
+  private $_expSideActivitiesColumn = NULL;
   private $_eduNameInstitutionColumn = NULL;
   private $_eduFieldOfStudyColumn = NULL;
 
@@ -42,18 +45,54 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_whereParams = array();
   private $_whereIndex = NULL;
 
+  // property for restriction activity type id
+  private $_restrictionsActivityTypeId = NULL;
+  private $_scheduledActivityStatusValue = NULL;
+
   /**
    * CRM_Findexpert_Form_Search_FindExpert constructor.
    * @param $formValues
-   * @throws Exception when unable to find option groups with API
+   * @throws Exception when unable to find option group with API
    */
   function __construct(&$formValues) {
     $this->setLanguagesWithLevels();
     $this->setRequiredCustomTables();
     $this->setRequiredCustomColumns();
 
+    try {
+      $activityTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'activity_type', 'return' => 'id'));
+      $restrictionsParams = array(
+        'option_group_id' => $activityTypeOptionGroupId,
+        'name' => 'Restrictions',
+        'return' => 'value'
+      );
+      try {
+        $this->_restrictionsActivityTypeId = civicrm_api3('OptionValue', 'Getvalue', $restrictionsParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        $this->_restrictionsActivityTypeId = NULL;
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find option group for activity type in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
+
+    try {
+      $activityStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'activity_status', 'return' => 'id'));
+      $scheduledParams = array(
+        'option_group_id' => $activityStatusOptionGroupId,
+        'name' => 'Scheduled',
+        'return' => 'value'
+      );
+      try {
+        $this->_scheduledActivityStatusValue = civicrm_api3('OptionValue', 'Getvalue', $scheduledParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        $this->_scheduledActivityStatusValue = NULL;
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find option group for activity status in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
     parent::__construct($formValues);
   }
+
   /**
    * Prepare a set of search fields
    *
@@ -73,8 +112,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       array('id' => 'expertise_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
     );
 
-    $genericSkillsList = $this->getGenericSkillsList();
-    $form->add('select', 'generic_id', ts('Generic Skill(s)'), $genericSkillsList, FALSE,
+    $this->getGenericSkillsList();
+    $form->add('select', 'generic_id', ts('Generic Skill(s)'), $this->_genericSkillsList, FALSE,
       array('id' => 'generic_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
     );
 
@@ -132,7 +171,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   /**
    * Method to get generic skills
    *
-   * @return array
+   * @return void
    * @throws Exception when option group not found
    */
   private function getGenericSkillsList() {
@@ -144,15 +183,14 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       generic_skilss_20140825142210 in extension nl.pum.findexpert, contact your system administrator.
       Error from API OptionGroup Getvalue: '.$ex->getMessage().' with params '.implode('; ', $genericSkillsParams));
     }
-    $result = array();
+    $this->_genericSkillsList = array();
     try {
       $optionValues = civicrm_api3('OptionValue', 'Get',
         array('option_group_id' => $genericSkillsOptionGroupId, 'is_active' => 1));
       foreach ($optionValues['values'] as $genericSkill) {
-        $result[$genericSkill['value']] = $genericSkill['label'];
+        $this->_genericSkillsList[$genericSkill['value']] = $genericSkill['label'];
       }
     } catch (CiviCRM_API3_Exception $ex) {}
-    return $result;
   }
 
   /**
@@ -178,11 +216,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    *  - total: numeric
    */
   function summary() {
-    return NULL;
-    // return array(
-    //   'summary' => 'This is a summary',
-    //   'total' => 50.0,
-    // );
+    return array(
+      'summary' => 'Total number of experts found that match your criteria',
+      'total' => $this->count()
+      );
   }
 
   /**
@@ -195,10 +232,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $columns = array(
       ts('Contact Id') => 'contact_id',
       ts('Expert') => 'display_name',
-      ts('Last Main Activity') => 'last_main',
+      //ts('Last Main Activity') => 'last_main',
       ts('Main Sector') => 'main_sector',
       ts('Expert Status') => 'expert_status',
-      ts('No. of Main Act') => 'main_count',
+      //ts('No. of Main Act') => 'main_count',
       ts('Has Restrictions') => 'restrictions'
     );
     return $columns;
@@ -255,16 +292,19 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereClauses = array();
     $this->_whereParams = array();
     // basic where clauses that always apply: contact is expert and not deceased
-    $this->setInitialWhereClauses();
+    $this->addInitialWhereClauses();
     // sector clauses if selected
-    $this->setSectorWhereClauses();
+    $this->addSectorWhereClauses();
     // area of expertise clauses if selected
-    //$this->setExpertiseWhereClauses();
-
-
-    //CRM_Core_Error::debug('where clauses', $this->_whereClauses);
-    //CRM_Core_Error::debug('where params', $this->_whereParams);
-    //exit();
+    $this->addExpertiseWhereClauses();
+    // generic skills clauses if selected
+    $this->addGenericSkillsWhereClauses();
+    // language and level clauses if selected
+    $this->addLanguageLevelWhereClauses();
+    // overall search string clause if selected
+    $this->addOverallSearchWhereClause();
+    // countries visited clauses if selected
+    $this->addCountriesVisitedWhereClause();
 
     if (!empty($this->_whereClauses)) {
       $where = implode(' AND ', $this->_whereClauses);
@@ -273,9 +313,101 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   }
 
   /**
-   * Method to set the sector where clauses
+   * Methdd to add the countries visited where clause
    */
-  private function setSectorWhereClauses() {
+  private function addCountriesVisitedWhereClause() {
+    if (isset($this->_formValues['countries_visited'])) {
+      $countryIndex = array();
+      foreach ($this->_formValues['countries_visited'] as $countryVisitedId) {
+        $this->_whereIndex++;
+        $this->_whereParams[$this->_whereIndex] = array(CRM_Core_DAO::VALUE_SEPARATOR.$countryVisitedId.
+          CRM_Core_DAO::VALUE_SEPARATOR, 'String');
+        $countryIndex[] = '%'.$this->_whereIndex;
+      }
+      if (!empty($countryIndex)) {
+        $this->_whereClauses[] = '(wh.'.$this->_whCountriesVisitedColumn.' IN('.implode(', ', $countryIndex).'))';
+      }
+    }
+  }
+
+  /**
+   * Method to add the overall search string where clause
+   */
+  private function addOverallSearchWhereClause() {
+    if (isset($this->_formValues['overall_string'])) {
+      $searchColumns = array($this->_expSideActivitiesColumn, $this->_eduFieldOfStudyColumn, $this->_eduNameInstitutionColumn,
+        $this->_whCompetencesUsedColumn, $this->_whDescriptionColumn, $this->_whNameOfOrganizationColumn, $this->_whResponsibilitiesColumn);
+      $this->_whereIndex++;
+      $this->_whereParams[$this->_whereIndex] = array('%'.$this->_formValues['overall_string'].'%', 'String');
+      $clauses = array();
+      foreach ($searchColumns as $searchColumn) {
+        $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
+      }
+      $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
+    }
+  }
+
+  /**
+   * Method to add the language and level where clauses
+   */
+  private function addLanguageLevelWhereClauses() {
+    if (isset($this->_formValues['language_id'])) {
+      $languageLevelClauses = array();
+      foreach ($this->_formValues['language_id'] as $languageLevelId) {
+        $this->_whereIndex++;
+        $clause = '('.$this->_llLanguagesColumn.' = %'.$this->_whereIndex;
+        $this->_whereParams[$this->_whereIndex] = array($this->_languagesWithLevels[$languageLevelId]['language_id'], 'String');
+        // only if a language with another level than 'Any' is selected a level part of the clause is required
+        if (!empty($this->_languagesWithLevels[$languageLevelId]['level_id'])) {
+          $this->_whereIndex++;
+          $clause .= ' AND ' . $this->_llLevelColumn .' = %'.$this->_whereIndex;
+          $this->_whereParams[$this->_whereIndex] = array($this->_languagesWithLevels[$languageLevelId]['level_id'], 'String');
+        }
+        $languageLevelClauses[] = $clause.')';
+      }
+      if (!empty($languageLevelClauses)) {
+        $this->_whereClauses[] = '('.implode(' OR ', $languageLevelClauses).')';
+      }
+    }
+  }
+
+  /**
+   * Method to add the generic skills where clauses
+   */
+  private function addGenericSkillsWhereClauses() {
+    if (isset($this->_formValues['generic_id'])) {
+      $genericClauses = array();
+      foreach ($this->_formValues['generic_id'] as $genericId) {
+        $this->_whereIndex++;
+        $genericClauses[] = $this->_expGenericColumn.' LIKE %'.$this->_whereIndex;
+        $this->_whereParams[$this->_whereIndex] = array('%'.$this->_genericSkillsList[$genericId].'%', 'String');
+      }
+      if (!empty($genericClauses)) {
+        $this->_whereClauses[] = '('.implode(' OR ', $genericClauses).')';
+      }
+    }
+  }
+  /**
+   * Method to add the area of expertise where clauses
+   */
+  private function addExpertiseWhereClauses() {
+    if (isset($this->_formValues['expertise_id'])) {
+      $expertiseIds = array();
+      foreach ($this->_formValues['expertise_id'] as $expertiseId) {
+        $this->_whereIndex++;
+        $expertiseIds[$this->_whereIndex] = $expertiseId;
+        $this->_whereParams[$this->_whereIndex] = array($expertiseId, 'Integer');
+      }
+      if (!empty($expertiseIds)) {
+        $this->_whereClauses[] = '(areas.segment_id IN('.implode(', ', $expertiseIds).'))';
+      }
+    }
+  }
+
+  /**
+   * Method to add the sector where clauses
+   */
+  private function addSectorWhereClauses() {
     if (isset($this->_formValues['sector_id'])) {
       $sectorIds = array();
       foreach ($this->_formValues['sector_id'] as $sectorId) {
@@ -284,7 +416,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $this->_whereParams[$this->_whereIndex] = array($sectorId, 'Integer');
       }
       if (!empty($sectorIds)) {
-        $this->_whereClauses[] = 'main.segment_id IN('.implode(', ', $sectorIds).') OR other.segment_id IN('.implode(', ', $sectorIds).')';
+        $this->_whereClauses[] = '(main.segment_id IN('.implode(', ', $sectorIds).') OR other.segment_id IN('.implode(', ', $sectorIds).'))';
       }
     }
   }
@@ -306,9 +438,33 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return void
    */
   function alterRow(&$row) {
-    // todo : add number of main, restrictions yes/no and latest main
-    //CRM_Core_Error::debug('row', $row);
-    //exit();
+    // todo : add number of main and latest main
+    $row['restrictions'] = $this->setRestrictions($row['contact_id']);
+  }
+
+  /**
+   * Method to check if there are active restrictions for expert
+   * 
+   * @param $contactId
+   * @return string
+   */
+  private function setRestrictions($contactId) {
+    try {
+      $activities = civicrm_api3('Activity', 'Getcount', array(
+        'activity_type_id' => $this->_restrictionsActivityTypeId,
+        'target_contact_id' => $contactId,
+        'is_current_revision' => 1,
+        'is_deleted' => 0,
+        'status_id' => $this->_scheduledActivityStatusValue
+      ));
+      if ($activities > 0) {
+        return 'Yes';
+      } else {
+        return 'No';
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      return 'No';
+    }
   }
 
   /**
@@ -411,6 +567,9 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_expStatusColumn = civicrm_api3('CustomField', 'Getvalue', array(
       'custom_group_id' => $this->_expertDataCustomGroupId, 'name' => 'expert_status',
       'return' => 'column_name'));
+    $this->_expSideActivitiesColumn = civicrm_api3('CustomField', 'Getvalue', array(
+      'custom_group_id' => $this->_expertDataCustomGroupId, 'name' => 'side_activities',
+      'return' => 'column_name'));
 
     // required columns for languages
     $this->_llLanguagesColumn = civicrm_api3('CustomField', 'Getvalue', array(
@@ -441,10 +600,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   /**
    * Method to set the initial where clauses that apply to each instance
    */
-  private function setInitialWhereClauses() {
-    $this->_whereClauses[] = "contact_a.contact_sub_type LIKE %1";
+  private function addInitialWhereClauses() {
+    $this->_whereClauses[] = '(contact_a.contact_sub_type LIKE %1)';
     $this->_whereParams[1] = array('%Expert%', 'String');
-    $this->_whereClauses[] = "contact_a.is_deceased = %2";
+    $this->_whereClauses[] = '(contact_a.is_deceased = %2)';
     $this->_whereParams[2] = array(0, 'Integer');
     $this->_whereIndex = 2;
   }
