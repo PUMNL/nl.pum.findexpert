@@ -48,6 +48,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   // property for restriction activity type id
   private $_restrictionsActivityTypeId = NULL;
   private $_scheduledActivityStatusValue = NULL;
+
+  // properties for valid case types and case status for latest main activity
+  private $_validCaseTypes = array();
+  private $_validCaseStatus = array();
   
   /**
    * CRM_Findexpert_Form_Search_FindExpert constructor.
@@ -59,38 +63,11 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->getGenericSkillsList();
     $this->setRequiredCustomTables();
     $this->setRequiredCustomColumns();
+    $this->setActivityTypes();
+    $this->setActivityStatus();
+    $this->setValidCaseTypes();
+    $this->setValidCaseStatus();
 
-    try {
-      $activityTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'activity_type', 'return' => 'id'));
-      $restrictionsParams = array(
-        'option_group_id' => $activityTypeOptionGroupId,
-        'name' => 'Restrictions',
-        'return' => 'value'
-      );
-      try {
-        $this->_restrictionsActivityTypeId = civicrm_api3('OptionValue', 'Getvalue', $restrictionsParams);
-      } catch (CiviCRM_API3_Exception $ex) {
-        $this->_restrictionsActivityTypeId = NULL;
-      }
-    } catch (CiviCRM_API3_Exception $ex) {
-      throw new Exception('Could not find option group for activity type in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
-    }
-
-    try {
-      $activityStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'activity_status', 'return' => 'id'));
-      $scheduledParams = array(
-        'option_group_id' => $activityStatusOptionGroupId,
-        'name' => 'Scheduled',
-        'return' => 'value'
-      );
-      try {
-        $this->_scheduledActivityStatusValue = civicrm_api3('OptionValue', 'Getvalue', $scheduledParams);
-      } catch (CiviCRM_API3_Exception $ex) {
-        $this->_scheduledActivityStatusValue = NULL;
-      }
-    } catch (CiviCRM_API3_Exception $ex) {
-      throw new Exception('Could not find option group for activity status in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
-    }
     parent::__construct($formValues);
   }
 
@@ -218,7 +195,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $columns = array(
       ts('Contact Id') => 'contact_id',
       ts('Expert') => 'display_name',
-      //ts('Last Main Activity') => 'last_main',
+      ts('Last Main Activity') => 'last_main',
       ts('Main Sector') => 'main_sector',
       ts('Expert Status') => 'expert_status',
       //ts('No. of Main Act') => 'main_count',
@@ -424,8 +401,62 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return void
    */
   function alterRow(&$row) {
-    // todo : add number of main and latest main
+    // todo : add number of main
     $row['restrictions'] = $this->setRestrictions($row['contact_id']);
+    $row['latest_main'] = $this->setLatestMain($row['contact_id']);
+  }
+
+  /**
+   * Method to retrieve the latest case for the contact of case type
+   * Advice, RemoteCoaching, Seminar or Business where case status is
+   * either Matching, Execution, Debriefing, Preparation or Completed
+   *
+   * @param int $contactId
+   * @return string
+   * @throws Exception when no relationship type Expert found
+   */
+  private function setLatestMain($contactId) {
+    // build query for civicrm_relationship where type = Expert and case id is not empty
+    // joined with case data of the right case type and status
+    try {
+      $expertRelationshipTypeId = civicrm_api3('RelationshipType', 'Getvalue', array('name_a_b' => 'Expert', 'return' => 'id'));
+      $query = "SELECT cc.subject 
+        FROM civicrm_relationship rel 
+        JOIN civicrm_case cc ON rel.case_id = cc.id
+        LEFT JOIN civicrm_value_main_activity_info main ON rel.case_id = main.entity_id
+        WHERE rel.relationship_type_id = %1 AND rel.contact_id_b = %2 AND cc.is_deleted = %3";
+        $params = array(
+          1 => array($expertRelationshipTypeId, 'Integer'),
+          2 => array($contactId, 'Integer'),
+          3 => array(0, 'Integer')
+        );
+      $index = 3;
+      // set where clauses for case status
+      if (!empty($this->_validCaseStatus)) {
+        $statusValues = array();
+        foreach ($this->_validCaseStatus as $statusId => $statusName) {
+          $index++;
+          $params[$index] = array($statusId, 'Integer');
+          $statusValues[] = '%' . $index;
+        }
+        $query .= ' AND cc.status_id IN(' . implode(', ', $statusValues).')';
+      }
+      // set where clauses for case types
+      if (!empty($this->_validCaseTypes)) {
+        $typeValues = array();
+        foreach ($this->_validCaseTypes as $caseTypeId => $caseTypeName) {
+          $index++;
+          $params[$index] = array('%' . $caseTypeId . '%', 'String');
+          $typeValues[] = 'cc.case_type_id LIKE %' . $index;
+        }
+        $query .= ' AND ('.implode(' OR ', $typeValues).')';
+      }
+      $query .= ' ORDER BY main.start_date DESC LIMIT 1';
+      return CRM_Core_DAO::singleValueQuery($query, $params);
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find a relationship type with name Expert in '.__METHOD__
+        .', error from API RelationshipType Getvalue: '.$ex->getMessage());
+    }
   }
 
   /**
@@ -595,5 +626,91 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereParams[3] = array('Exit', 'String');
     $this->_whereParams[4] = array('Suspended', 'String');
     $this->_whereIndex = 4;
+  }
+
+  /**
+   * Method to set activity type properties
+   *
+   * @throws Exception when no option group activity type found
+   */
+  private function setActivityTypes() {
+    try {
+      $activityTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'activity_type', 'return' => 'id'));
+      $restrictionsParams = array(
+        'option_group_id' => $activityTypeOptionGroupId,
+        'name' => 'Restrictions',
+        'return' => 'value'
+      );
+      try {
+        $this->_restrictionsActivityTypeId = civicrm_api3('OptionValue', 'Getvalue', $restrictionsParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        $this->_restrictionsActivityTypeId = NULL;
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find option group for activity type in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
+  }
+
+  /**
+   * Method to set activity status properties
+   *
+   * @throws Exception when no option group activity status found
+   */
+  private function setActivityStatus() {
+    try {
+      $activityStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'activity_status', 'return' => 'id'));
+      $scheduledParams = array(
+        'option_group_id' => $activityStatusOptionGroupId,
+        'name' => 'Scheduled',
+        'return' => 'value'
+      );
+      try {
+        $this->_scheduledActivityStatusValue = civicrm_api3('OptionValue', 'Getvalue', $scheduledParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        $this->_scheduledActivityStatusValue = NULL;
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find option group for activity status in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
+  }
+
+  /**
+   * Method to set the valid case types for latest main activity
+   *
+   * @throws Exception when no option group case type found
+   */
+  private function setValidCaseTypes() {
+    $requiredCaseTypes = array('Advice', 'Business', 'RemoteCoaching', 'Seminar');
+    try {
+      $caseTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_type', 'return' => 'id'));
+      $foundCaseTypes = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $caseTypeOptionGroupId, 'is_active' => 1));
+      foreach ($foundCaseTypes['values'] as $caseType) {
+        if (in_array($caseType['name'], $requiredCaseTypes)) {
+          $this->_validCaseTypes[$caseType['value']] = $caseType['name'];
+        }
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find option group for case type in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
+  }
+
+  /**
+   * Method to set the valid case status for latest main activity
+   *
+   * @throws Exception when no option group case status found
+   */
+  private function setValidCaseStatus() {
+    $requiredCaseStatus = array('Completed', 'Debriefing', 'Execution', 'Matching', 'Preparation');
+    try {
+      $caseStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_status', 'return' => 'id'));
+      $foundCaseStatus = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $caseStatusOptionGroupId, 'is_active' => 1));
+      foreach ($foundCaseStatus['values'] as $caseStatus) {
+        if (in_array($caseStatus['name'], $requiredCaseStatus)) {
+          $this->_validCaseStatus[$caseStatus['value']] = $caseStatus['name'];
+        }
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find option group for case status in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
   }
 }
