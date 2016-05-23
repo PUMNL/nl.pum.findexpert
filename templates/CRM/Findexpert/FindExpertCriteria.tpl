@@ -119,7 +119,7 @@
               {ts}You can search the expert data on a string.
               The default behaviour is it will search for everything you enter in this field. So if you enter <em>ecological farm</em> it will search for that complete text string.
               If you want to search for <em>ecological</em> OR <em>farm</em> you should put brackets around your search string and separate the words with comma's. The field should now have the input <em>(ecological, farm)</em>.
-              If you want to search for <em>ecological</em> AND <em>farm</em> as separate words you should put curly brackets around your search string and separate the words with comma's. The field should now have the input <em>{ecological, farm}</em>.
+              If you want to search for <em>ecological</em> AND <em>farm</em> as separate words you should put curly brackets around your search string and separate the words with comma's. The field should now have the input <em>{literal}{ecological, farm}{/literal}</em>.
               {/ts}
             </div>
             <div class="label">
