@@ -216,6 +216,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return string, sql
    */
   function all($offset = 0, $rowcount = 0, $sort = NULL, $includeContactIDs = FALSE, $justIDs = FALSE) {
+    CRM_Core_Error::debug('query', $this->sql($this->select(), $offset, $rowcount, $sort, $includeContactIDs, NULL));
+    exit();
     // delegate to $this->sql(), $this->select(), $this->from(), $this->where(), etc.
     return $this->sql($this->select(), $offset, $rowcount, $sort, $includeContactIDs, NULL);
   }
@@ -273,10 +275,6 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     if (!empty($this->_whereClauses)) {
       $where = implode(' AND ', $this->_whereClauses);
     }
-    $test = $this->whereClause($where, $this->_whereParams);
-    CRM_Core_Error::debug('where', $test);
-    CRM_Core_Error::debug('params', $this->_whereParams);
-    exit();
     return $this->whereClause($where, $this->_whereParams);
   }
 
