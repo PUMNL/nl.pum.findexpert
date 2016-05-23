@@ -325,8 +325,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $searchValues = explode(',', $trimmedSearch);
     foreach ($searchValues as $searchValue) {
       CRM_Core_Error::debug('trimmed', trim($searchValue));
-      exit();
     }
+    exit();
   }
   /**
    * Method for a single string in overall search
