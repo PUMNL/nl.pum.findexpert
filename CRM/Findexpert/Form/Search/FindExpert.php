@@ -311,15 +311,20 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       $firstChar = substr($this->_formValues['overall_string'], 0, 1);
       $lastChar = substr($this->_formValues['overall_string'], -1, 1);
       if ($firstChar == "(" && $lastChar == ")") {
-        $clauses = $this->stringMultipleClauses('OR');
+        $this->stringMultipleClauses('OR');
       } elseif ($firstChar == "{" && $lastChar == "}") {
-        $clauses = $this->stringMultipleClauses('AND');
+        $this->stringMultipleClauses('AND');
       } else {
-        $clauses = $this->stringSingleClause();
+        $this->stringSingleClause();
       }
     }
   }
 
+  /**
+   * Method for multiple string elements in overall search
+   * 
+   * @param $operator
+   */
   private function stringMultipleClauses($operator) {
     $trimmedSearch = substr($this->_formValues['overall_string'], 1, -1);
     $searchValues = explode(',', $trimmedSearch);
@@ -332,11 +337,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
       }
       $searchClauses[] = '('.implode(' '.$operator.' ', $clauses).')';
-      CRM_Core_Error::debug('searchClauses', $searchClauses);
     }
     $this->_whereClauses[] = '('.implode(' OR ', $searchClauses).')';
-    CRM_Core_Error::debug('whereClauses', $this->_whereClauses);
-    exit();
   }
   /**
    * Method for a single string in overall search
