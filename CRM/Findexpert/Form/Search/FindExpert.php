@@ -323,9 +323,19 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private function stringMultipleClauses($operator) {
     $trimmedSearch = substr($this->_formValues['overall_string'], 1, -1);
     $searchValues = explode(',', $trimmedSearch);
+    $searchClauses = array();
     foreach ($searchValues as $searchValue) {
-      CRM_Core_Error::debug('trimmed', trim($searchValue));
+      $this->_whereIndex++;
+      $this->_whereParams[$this->_whereIndex] = array('%'.trim($searchValue).'%', 'String');
+      $clauses = array();
+      foreach ($this->_searchColumns as $searchColumn) {
+        $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
+      }
+      $searchClauses[] = '('.implode(' '.$operator.' ', $clauses).')';
+      CRM_Core_Error::debug('searchClauses', $searchClauses);
     }
+    $this->_whereClauses[] = '('.implode(' OR ', $searchClauses).')';
+    CRM_Core_Error::debug('whereClauses', $this->_whereClauses);
     exit();
   }
   /**
