@@ -322,8 +322,11 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
 
   private function stringMultipleClauses($operator) {
     $trimmedSearch = substr($this->_formValues['overall_string'], 1, -1);
-    CRM_Core_Error::debug('trimmed', $trimmedSearch);
-    exit();
+    $searchValues = explode(',', $trimmedSearch);
+    foreach ($searchValues as $searchValue) {
+      CRM_Core_Error::debug('trimmed', trim($searchValue));
+      exit();
+    }
   }
   /**
    * Method for a single string in overall search
