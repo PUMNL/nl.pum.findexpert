@@ -44,6 +44,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_whereClauses = array();
   private $_whereParams = array();
   private $_whereIndex = NULL;
+  private $_searchColumns = array();
 
   // property for restriction activity type id
   private $_restrictionsActivityTypeId = NULL;
@@ -305,23 +306,36 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   private function addOverallSearchWhereClause() {
     if (isset($this->_formValues['overall_string']) && !empty($this->_formValues['overall_string'])) {
+      $this->_searchColumns = array($this->_expSideActivitiesColumn, $this->_eduFieldOfStudyColumn, $this->_eduNameInstitutionColumn,
+        $this->_whCompetencesUsedColumn, $this->_whDescriptionColumn, $this->_whNameOfOrganizationColumn, $this->_whResponsibilitiesColumn);
       $firstChar = substr($this->_formValues['overall_string'], 0, 1);
       $lastChar = substr($this->_formValues['overall_string'], -1, 1);
-      CRM_Core_Error::debug('firstChar', $firstChar);
-      CRM_Core_Error::debug('lastChar', $lastChar);
-      exit();
-
-
-      $searchColumns = array($this->_expSideActivitiesColumn, $this->_eduFieldOfStudyColumn, $this->_eduNameInstitutionColumn,
-        $this->_whCompetencesUsedColumn, $this->_whDescriptionColumn, $this->_whNameOfOrganizationColumn, $this->_whResponsibilitiesColumn);
-      $this->_whereIndex++;
-      $this->_whereParams[$this->_whereIndex] = array('%'.$this->_formValues['overall_string'].'%', 'String');
-      $clauses = array();
-      foreach ($searchColumns as $searchColumn) {
-        $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
+      if ($firstChar == "(" && $lastChar == ")") {
+        $clauses = $this->stringMultipleClauses('OR');
+      } elseif ($firstChar == "{" && $lastChar == "}") {
+        $clauses = $this->stringMultipleClauses('AND');
+      } else {
+        $clauses = $this->stringSingleClause();
       }
-      $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
     }
+  }
+
+  private function stringMultipleClauses($operator) {
+    $trimmedSearch = substr($this->_formValues['overall_string'], 1, -1);
+    CRM_Core_Error::debug('trimmed', $trimmedSearch);
+    exit();
+  }
+  /**
+   * Method for a single string in overall search
+   */
+  private function stringSingleClause() {
+    $this->_whereIndex++;
+    $this->_whereParams[$this->_whereIndex] = array('%'.$this->_formValues['overall_string'].'%', 'String');
+    $clauses = array();
+    foreach ($this->_searchColumns as $searchColumn) {
+      $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
+    }
+    $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
   }
 
   /**
