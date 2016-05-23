@@ -273,7 +273,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     if (!empty($this->_whereClauses)) {
       $where = implode(' AND ', $this->_whereClauses);
     }
-    CRM_Core_Error::debug('where', $this->_whereClause($where, $this->_whereParams));
+    $test = $this->whereClause($where, $this->_whereParams);
+    CRM_Core_Error::debug('where', $test);
     exit();
     return $this->whereClause($where, $this->_whereParams);
   }
