@@ -225,6 +225,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return string, sql fragment with SELECT arguments
    */
   function select() {
+    CRM_Core_Error::debug('this', $this);
+    exit();
     return "DISTINCT(contact_a.id) AS contact_id, contact_a.display_name AS display_name, 
     main.main_sector, exp.".$this->_expStatusColumn." AS expert_status";
   }
