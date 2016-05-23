@@ -225,8 +225,6 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return string, sql fragment with SELECT arguments
    */
   function select() {
-    CRM_Core_Error::debug('this', $this);
-    exit();
     return "DISTINCT(contact_a.id) AS contact_id, contact_a.display_name AS display_name, 
     main.main_sector, exp.".$this->_expStatusColumn." AS expert_status";
   }
@@ -296,9 +294,24 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
 
   /**
    * Method to add the overall search string where clause
+   *
+   * if first char = (, then all words separated by comma in overall string to be used in OR
+   * (so if value is "CiviCRM, Drupal" the clause will be LIKE %CiviCRM% or LIKE %Drupal%
+   *
+   * if first char = { then all words separated by comma in overall string to be used in AND
+   * (so if value is {CiviCRM Drupal} the clause will be LIKE %CiviCRM% and LIKE %Drupal%
+   *
+   * default LIKE %<complete string>%
    */
   private function addOverallSearchWhereClause() {
     if (isset($this->_formValues['overall_string']) && !empty($this->_formValues['overall_string'])) {
+      $firstChar = substr($this->_formValues['overall_string'], 0, 1);
+      $lastChar = substr($this->_formValues['overall_string'], -1, 1);
+      CRM_Core_Error::debug('firstChar', $firstChar);
+      CRM_Core_Error::debug('lastChar', $lastChar);
+      exit();
+
+
       $searchColumns = array($this->_expSideActivitiesColumn, $this->_eduFieldOfStudyColumn, $this->_eduNameInstitutionColumn,
         $this->_whCompetencesUsedColumn, $this->_whDescriptionColumn, $this->_whNameOfOrganizationColumn, $this->_whResponsibilitiesColumn);
       $this->_whereIndex++;
