@@ -260,7 +260,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   function select() {
     return "DISTINCT(contact_a.id) AS contact_id, contact_a.display_name AS display_name, 
-    main.main_sector, exp.".$this->_expStatusColumn." AS expert_status";
+    main.main_sector, exp.".$this->_expStatusColumn." AS expert_status, NULL AS restrictions, NULL as last_main";
   }
 
   /**
