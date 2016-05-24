@@ -158,7 +158,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     foreach ($sectors['values'] as $sectorId => $sector) {
       $result[$sectorId] = $sector['label'];
     }
-    return $result;
+    return asort($result);
   }
 
   /**
