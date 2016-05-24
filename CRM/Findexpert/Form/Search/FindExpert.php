@@ -250,6 +250,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   function all($offset = 0, $rowcount = 0, $sort = NULL, $includeContactIDs = FALSE, $justIDs = FALSE) {
     // delegate to $this->sql(), $this->select(), $this->from(), $this->where(), etc.
+    $query = $this->sql($this->select(), $offset, $rowcount, $sort, $includeContactIDs, NULL);
+    CRM_Core_Error::debug('query', $query);
+    exit();
+    
     return $this->sql($this->select(), $offset, $rowcount, $sort, $includeContactIDs, NULL);
   }
 
