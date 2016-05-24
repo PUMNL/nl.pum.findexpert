@@ -378,9 +378,9 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       foreach ($this->_searchColumns as $searchColumn) {
         $clauses[] = $searchColumn.' '.$this->_searchLike.' %'.$this->_whereIndex;
       }
-      $searchClauses[] = '('.implode(' '.$operator.' ', $clauses).')';
+      $searchClauses[] = '('.implode(' OR ', $clauses).')';
     }
-    $this->_whereClauses[] = '('.implode(' OR ', $searchClauses).')';
+    $this->_whereClauses[] = '('.implode(' '.$operator.' ', $searchClauses).')';
   }
   /**
    * Method for a single string in overall search
