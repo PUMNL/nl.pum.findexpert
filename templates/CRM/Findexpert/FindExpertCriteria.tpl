@@ -129,6 +129,13 @@
               {$form.overall_string.html}
             </div>
             <div class="clear"></div>
+            <div class="label">
+              <label for="ignore_cases">{$form.ignore_cases.label}</label>
+            </div>
+            <div class="content" id="ignore-cases">
+              {$form.ignore_cases.html}
+            </div>
+            <div class="clear"></div>
           </div>
         {/if}
 
