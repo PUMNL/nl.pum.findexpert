@@ -177,6 +177,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $result[$areaId] = $area['label'];
       }
     }
+    asort($result);
     return $result;
   }
 
