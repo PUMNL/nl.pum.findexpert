@@ -40,11 +40,12 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_eduNameInstitutionColumn = NULL;
   private $_eduFieldOfStudyColumn = NULL;
 
-  // properties for clauses and params
+  // properties for clauses, params, searchColumns and likes
   private $_whereClauses = array();
   private $_whereParams = array();
   private $_whereIndex = NULL;
   private $_searchColumns = array();
+  private $_searchLike = NULL;
 
   // property for restriction activity type id
   private $_restrictionsActivityTypeId = NULL;
@@ -108,9 +109,41 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         'multiple' => 'multiple', 'title' => ts('- select -'))
     );
 
-    $form->assign('elements', array('sector_id', 'expertise_id', 'generic_id', 'language_id', 
+    $allCases = array(
+      '1' => ts('Case insensitive (ignore upper/lower case when searching)'),
+      '0' => ts('Case sensitive (respect upper/lower case when searching'),
+    );
+    $form->addRadio('ignore_cases', ts('Ignore capitals?'), $allCases, NULL, '<br />', TRUE);
+    $defaults['ignore_cases'] = 1;
+    $form->setDefaults($defaults);
+    
+    $form->assign('elements', array('sector_id', 'expertise_id', 'generic_id', 'language_id',
       'overall_string', 'countries_visited'));
     $form->addButtons(array(array('type' => 'refresh', 'name' => ts('Search'), 'isDefault' => TRUE,),));
+  }
+
+  /**
+   * Function to add validation rules
+   */
+  function addRules() {
+    $this->addFormRule(array('CRM_Findexpert_Form_Search_FindExpert', 'validateSearchString'));
+  }
+
+  /**
+   * Method to validate overall search string (min 4 chars)
+   *
+   * @param $fields
+   * @return bool
+   * @static
+   */
+  public static function validateSearchString($fields) {
+    if (isset($fields['overall_string'])) {
+      if (strlen($fields['overall_string']) > 4) {
+        $errors['overall_string'] = ts('You can not search for less than 4 characters as this would possible make a very slow search');
+        return $errors;
+      }
+    }
+    return TRUE;
   }
 
   /**
@@ -305,6 +338,11 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * default LIKE %<complete string>%
    */
   private function addOverallSearchWhereClause() {
+    if (isset($this->_formValues['ignore_cases']) && empty($this->_formValues['ignore_cases'])) {
+      $this->_searchLike = 'LIKE BINARY';
+    } else {
+      $this->_searchLike = 'LIKE';
+    }
     if (isset($this->_formValues['overall_string']) && !empty($this->_formValues['overall_string'])) {
       $this->_searchColumns = array($this->_expSideActivitiesColumn, $this->_eduFieldOfStudyColumn, $this->_eduNameInstitutionColumn,
         $this->_whCompetencesUsedColumn, $this->_whDescriptionColumn, $this->_whNameOfOrganizationColumn, $this->_whResponsibilitiesColumn);
@@ -334,7 +372,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       $this->_whereParams[$this->_whereIndex] = array('%'.trim($searchValue).'%', 'String');
       $clauses = array();
       foreach ($this->_searchColumns as $searchColumn) {
-        $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
+        $clauses[] = $searchColumn.' '.$this->_searchLike.' %'.$this->_whereIndex;
       }
       $searchClauses[] = '('.implode(' '.$operator.' ', $clauses).')';
     }
@@ -348,7 +386,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereParams[$this->_whereIndex] = array('%'.$this->_formValues['overall_string'].'%', 'String');
     $clauses = array();
     foreach ($this->_searchColumns as $searchColumn) {
-      $clauses[] = $searchColumn.' LIKE %'.$this->_whereIndex;
+      $clauses[] = $searchColumn.' '.$this->_searchLike.' %'.$this->_whereIndex;
     }
     $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
   }
