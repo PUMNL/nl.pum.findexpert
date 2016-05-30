@@ -211,7 +211,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       ts('Last Main Activity') => 'last_main',
       ts('Main Sector') => 'main_sector',
       ts('Expert Status') => 'expert_status',
-      //ts('No. of Main Act') => 'main_count',
+      ts('No. of Main Act') => 'main_count',
       ts('Has Restrictions') => 'restrictions'
     );
     return $columns;
@@ -239,7 +239,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   function select() {
     return "DISTINCT(contact_a.id) AS contact_id, contact_a.display_name AS display_name, 
-    main.main_sector, exp.".$this->_expStatusColumn." AS expert_status, NULL AS restrictions, NULL as last_main";
+    main.main_sector, exp.".$this->_expStatusColumn." AS expert_status, NULL AS restrictions, NULL as last_main,
+    NULL as main_count";
   }
 
   /**
@@ -462,9 +463,16 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return void
    */
   function alterRow(&$row) {
-    // todo : add number of main
     $row['restrictions'] = $this->setRestrictions($row['contact_id']);
-    $row['latest_main'] = $this->setLatestMain($row['contact_id']);
+    $row['last_main'] = $this->setLastMain($row['contact_id']);
+    if (method_exists('CRM_Threepeas_BAO_PumCaseRelation', 'getExpertNumberOfCases')) {
+      $mainCount = CRM_Threepeas_BAO_PumCaseRelation::getExpertNumberOfCases($row['contact_id']);
+    }
+    if ($mainCount) {
+      $row['main_count'] = CRM_Threepeas_BAO_PumCaseRelation::getExpertNumberOfCases($row['contact_id']);
+    } else {
+      $row['main_count'] = "";
+    }
   }
 
   /**
@@ -476,7 +484,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return string
    * @throws Exception when no relationship type Expert found
    */
-  private function setLatestMain($contactId) {
+  private function setLastMain($contactId) {
     // build query for civicrm_relationship where type = Expert and case id is not empty
     // joined with case data of the right case type and status
     try {
