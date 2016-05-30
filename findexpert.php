@@ -13,7 +13,7 @@ function findexpert_civicrm_validateForm( $formName, &$fields, &$files, &$form, 
     $customClass = $form->getVar('_customClass');
     if (get_class($customClass) == 'CRM_Findexpert_Form_Search_FindExpert') {
       $searchString = $fields['overall_string'];
-      if (!empty($searchString) && strlen($searchString < 4)) {
+      if (!empty($searchString) && strlen($searchString) < 4) {
         $errors['overall_string'] = ts("You can not search for less than 4 characters as this would possible make a very slow search");
       }
     }
