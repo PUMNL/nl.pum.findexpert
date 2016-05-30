@@ -3,6 +3,24 @@
 require_once 'findexpert.civix.php';
 
 /**
+ * Implements hook civicrm_validateForm().
+ * 
+ *  @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_validateForm
+ */
+
+function findexpert_civicrm_validateForm( $formName, &$fields, &$files, &$form, &$errors ) {
+  if ($formName == 'CRM_Contact_Form_Search_Custom') {
+    $customClass = $form->getVar('_customClass');
+    if (get_class($customClass) == 'CRM_Findexpert_Form_Search_FindExpert') {
+      $searchString = $fields['overall_string'];
+      if (!empty($searchString) && strlen($searchString < 4)) {
+        $errors['overall_string'] = ts("You can not search for less than 4 characters as this would possible make a very slow search");
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_civicrm_config().
  *
  * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_config

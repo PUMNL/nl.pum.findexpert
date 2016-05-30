@@ -122,29 +122,6 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $form->addButtons(array(array('type' => 'refresh', 'name' => ts('Search'), 'isDefault' => TRUE,),));
   }
 
-  /**
-   * Function to add validation rules
-   */
-  function addRules() {
-    $this->addFormRule(array('CRM_Findexpert_Form_Search_FindExpert', 'validateSearchString'));
-  }
-
-  /**
-   * Method to validate overall search string (min 4 chars)
-   *
-   * @param $fields
-   * @return bool
-   * @static
-   */
-  public static function validateSearchString($fields) {
-    if (isset($fields['overall_string'])) {
-      if (strlen($fields['overall_string']) > 4) {
-        $errors['overall_string'] = ts('You can not search for less than 4 characters as this would possible make a very slow search');
-        return $errors;
-      }
-    }
-    return TRUE;
-  }
 
   /**
    * Method to get the list of sectors
