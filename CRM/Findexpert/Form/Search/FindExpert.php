@@ -801,7 +801,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @throws Exception when no option group case status found
    */
   private function setValidCaseStatus() {
-    $requiredCaseStatus = array('Completed', 'Debriefing', 'Execution', 'Matching', 'Preparation');
+    $requiredCaseStatus = array('Execution', 'Matching', 'Preparation');
     try {
       $caseStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_status', 'return' => 'id'));
       $foundCaseStatus = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $caseStatusOptionGroupId, 'is_active' => 1));
