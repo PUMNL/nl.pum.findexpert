@@ -21,10 +21,12 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_educationCustomGroupTable = NULL;
   private $_expertDataCustomGroupTable = NULL;
   private $_languageCustomGroupTable = NULL;
+  private $_prinsHistoryCustomGroupTable = NULL;
   private $_workHistoryCustomGroupId = NULL;
   private $_educationCustomGroupId = NULL;
   private $_expertDataCustomGroupId = NULL;
   private $_languageCustomGroupId = NULL;
+  private $_prinsHistoryCustomGroupId = NULL;
 
   // custom field column names needed
   private $_whNameOfOrganizationColumn = NULL;
@@ -39,6 +41,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_expSideActivitiesColumn = NULL;
   private $_eduNameInstitutionColumn = NULL;
   private $_eduFieldOfStudyColumn = NULL;
+  private $_phPrinsHistoryColumn = NULL;
 
   // properties for clauses, params, searchColumns and likes
   private $_whereClauses = array();
@@ -256,7 +259,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     LEFT JOIN ".$this->_educationCustomGroupTable." edu ON contact_a.id = edu.entity_id
     LEFT JOIN ".$this->_expertDataCustomGroupTable." exp ON contact_a.id = exp.entity_id
     LEFT JOIN ".$this->_languageCustomGroupTable." ll ON contact_a.id = ll.entity_id
-    LEFT JOIN ".$this->_workHistoryCustomGroupTable." wh ON contact_a.id = wh.entity_id";
+    LEFT JOIN ".$this->_workHistoryCustomGroupTable." wh ON contact_a.id = wh.entity_id
+    LEFT JOIN ".$this->_prinsHistoryCustomGroupTable." ph ON contact_a.id = ph.entity_id";
   }
 
   /**
@@ -294,11 +298,26 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   private function addCountriesVisitedWhereClause() {
     if (isset($this->_formValues['countries_visited'])) {
+      $countries = CRM_Core_PseudoConstant::country();
       $clauses = array();
       foreach ($this->_formValues['countries_visited'] as $countryVisitedId) {
         $this->_whereIndex++;
         $this->_whereParams[$this->_whereIndex] = array('%'.$countryVisitedId.'%', 'String');
         $clauses[] = 'wh.'.$this->_whCountriesVisitedColumn.' LIKE %'.$this->_whereIndex;
+
+        /**
+         * Issue #3460
+         * Also search in Prins History for visited countries.
+         */
+        if (isset($countries[$countryVisitedId])) {
+          $countryName = $countries[$countryVisitedId];
+          $this->_whereIndex++;
+          $this->_whereParams[$this->_whereIndex] = array(
+            '%Country: %' . $countryName . '%',
+            'String'
+          );
+          $clauses[] = 'ph.' . $this->_phPrinsHistoryColumn . ' LIKE %' . $this->_whereIndex;
+        }
       }
       if (!empty($clauses)) {
         $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
@@ -623,6 +642,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       array('name' => 'expert_data', 'property' => '_expertData'),
       array('name' => 'Languages', 'property' => '_language'),
       array('name' => 'Workhistory', 'property' => '_workHistory'),
+      array('name' => 'prins_history', 'property' => '_prinsHistory'),
     );
     foreach ($customGroups as $customGroupData) {
       try {
@@ -683,6 +703,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       'return' => 'column_name'));
     $this->_whCountriesVisitedColumn = civicrm_api3('CustomField', 'Getvalue', array(
       'custom_group_id' => $this->_workHistoryCustomGroupId, 'name' => 'Countries_visited_in_relation_to_the_job',
+      'return' => 'column_name'));
+
+    $this->_phPrinsHistoryColumn = civicrm_api3('CustomField', 'Getvalue', array(
+      'custom_group_id' => $this->_prinsHistoryCustomGroupId, 'name' => 'prins_history',
       'return' => 'column_name'));
   }
 
