@@ -424,7 +424,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $this->_whereParams[$this->_whereIndex] = array($expertiseId, 'Integer');
       }
       if (!empty($expertiseIds)) {
-        $this->_whereClauses[] = '(areas.segment_id IN('.implode(', ', $expertiseIds).'))';
+        $this->_whereClauses[] = '(areas.segment_id IN('.implode(', ', $expertiseIds).') AND areas.is_active = 1 AND (areas.start_date IS NULL OR areas.start_date < NOW()) AND (areas.end_date IS NULL OR areas.end_date > NOW()))';
       }
     }
   }
@@ -441,7 +441,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $this->_whereParams[$this->_whereIndex] = array($sectorId, 'Integer');
       }
       if (!empty($sectorIds)) {
-        $this->_whereClauses[] = '(main.segment_id IN('.implode(', ', $sectorIds).') OR other.segment_id IN('.implode(', ', $sectorIds).'))';
+        $this->_whereClauses[] = '(
+          (main.segment_id IN('.implode(', ', $sectorIds).') AND main.is_active = 1 AND (main.start_date IS NULL OR main.start_date < NOW()) AND (main.end_date IS NULL OR main.end_date > NOW()) )
+          OR (other.segment_id IN('.implode(', ', $sectorIds).') AND other.is_active = 1 AND (other.start_date IS NULL OR other.start_date < NOW()) AND (other.end_date IS NULL OR other.end_date > NOW()) )
+          )';
       }
     }
   }
