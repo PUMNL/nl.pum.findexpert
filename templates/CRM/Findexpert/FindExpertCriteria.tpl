@@ -45,6 +45,7 @@
               {$form.sector_id.html}
               {literal}
                 <script type="text/javascript">
+                  var objAreaOfExpertisesByParent = {/literal}{$areas_of_expertise_list}{literal};
                   cj("select#sector_id").crmasmSelect({
                     respectParents: true
                   });
@@ -66,6 +67,26 @@
                 <script type="text/javascript">
                   cj("select#expertise_id").crmasmSelect({
                     respectParents: true
+                  });
+
+                  /*
+                   * Only show areas of expertises of selected sectors.
+                   */
+                  cj("select#sector_id").on('change', function() {
+                      var expertise_id_select = cj('select#expertise_id').parent('.crmasmContainer').children('select.crmasmSelect');
+                      var selectedSectors = cj("select#sector_id").val();
+                      if (selectedSectors) {
+                          expertise_id_select.children("option").hide();
+                          for (var i = 0; i < selectedSectors.length; i++) {
+                              var sector_id = selectedSectors[i];
+                              for (var j = 0; j < objAreaOfExpertisesByParent[sector_id].length; j++) {
+                                  var area_id = objAreaOfExpertisesByParent[sector_id][j].id;
+                                  expertise_id_select.children("option[value="+area_id+"]").show();
+                              }
+                          }
+                      } else {
+                          expertise_id_select.children("option").show();
+                      }
                   });
                 </script>
               {/literal}

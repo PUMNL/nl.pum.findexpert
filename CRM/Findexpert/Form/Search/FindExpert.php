@@ -94,6 +94,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $form->add('select', 'expertise_id', ts('Areas(s) of Expertise'), $areasOfExpertiseList, FALSE,
       array('id' => 'expertise_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
     );
+    $form->assign('areas_of_expertise_list', json_encode($this->getAreasOfExpertiseListByParentId()));
 
     $form->add('select', 'generic_id', ts('Generic Skill(s)'), $this->_genericSkillsList, FALSE,
       array('id' => 'generic_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
@@ -151,18 +152,34 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   private function getAreasOfExpertiseList() {
     $result = array();
-    $sectors = $this->getSectorList();
     $areas = civicrm_api3('Segment', 'Get', array());
     foreach ($areas['values'] as $areaId => $area) {
       if (!empty($area['parent_id'])) {
-        if (isset($sectors[$area['parent_id']])) {
-          $result[$areaId] = $sectors[$area['parent_id']].': '.$area['label'];
-        } else {
-          $result[$areaId] = $area['label'];
-        }
+        $result[$areaId] = $area['label'];
       }
     }
     asort($result);
+    return $result;
+  }
+
+  /**
+   * Method to get list of areas of expertise. Initially all, jQuery in tpl will
+   * determine what will be available based on selected sectors
+   *
+   * @return array
+   * @access private
+   */
+  private function getAreasOfExpertiseListByParentId() {
+    $result = array();
+    $areas = civicrm_api3('Segment', 'Get', array());
+    foreach ($areas['values'] as $areaId => $area) {
+      if (!empty($area['parent_id'])) {
+        $result[$area['parent_id']][] = array(
+          'label' => $area['label'],
+          'id' => $areaId,
+        );
+      }
+    }
     return $result;
   }
 
