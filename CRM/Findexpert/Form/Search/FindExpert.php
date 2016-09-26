@@ -151,10 +151,15 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   private function getAreasOfExpertiseList() {
     $result = array();
+    $sectors = $this->getSectorList();
     $areas = civicrm_api3('Segment', 'Get', array());
     foreach ($areas['values'] as $areaId => $area) {
       if (!empty($area['parent_id'])) {
-        $result[$areaId] = $area['label'];
+        if (isset($sectors[$area['parent_id']])) {
+          $result[$areaId] = $sectors[$area['parent_id']].': '.$area['label'];
+        } else {
+          $result[$areaId] = $area['label'];
+        }
       }
     }
     asort($result);
