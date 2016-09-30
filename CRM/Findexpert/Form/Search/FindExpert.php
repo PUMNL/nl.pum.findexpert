@@ -57,6 +57,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   // properties for valid case types and case status for latest main activity
   private $_validCaseTypes = array();
   private $_validCaseStatus = array();
+
+  private $caseStatusOptionGroupId;
   
   /**
    * CRM_Findexpert_Form_Search_FindExpert constructor.
@@ -533,17 +535,19 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     // joined with case data of the right case type and status
     try {
       $expertRelationshipTypeId = civicrm_api3('RelationshipType', 'Getvalue', array('name_a_b' => 'Expert', 'return' => 'id'));
-      $query = "SELECT cc.subject 
+      $query = "SELECT CONCAT(cc.subject, ' (', status.label, ')') 
         FROM civicrm_relationship rel 
         JOIN civicrm_case cc ON rel.case_id = cc.id
         LEFT JOIN civicrm_value_main_activity_info main ON rel.case_id = main.entity_id
-        WHERE rel.relationship_type_id = %1 AND rel.contact_id_b = %2 AND cc.is_deleted = %3";
+        LEFT JOIN civicrm_option_value status ON cc.status_id = status.value AND status.option_group_id = %1
+        WHERE rel.relationship_type_id = %2 AND rel.contact_id_b = %3 AND cc.is_deleted = %4";
         $params = array(
-          1 => array($expertRelationshipTypeId, 'Integer'),
-          2 => array($contactId, 'Integer'),
-          3 => array(0, 'Integer')
+          1 => array($this->caseStatusOptionGroupId, 'Integer'),
+          2 => array($expertRelationshipTypeId, 'Integer'),
+          3 => array($contactId, 'Integer'),
+          4 => array(0, 'Integer')
         );
-      $index = 3;
+      $index = 4;
       // set where clauses for case status
       if (!empty($this->_validCaseStatus)) {
         $statusValues = array();
@@ -820,8 +824,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private function setValidCaseStatus() {
     $requiredCaseStatus = array('Execution', 'Matching', 'Preparation');
     try {
-      $caseStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_status', 'return' => 'id'));
-      $foundCaseStatus = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $caseStatusOptionGroupId, 'is_active' => 1));
+      $this->caseStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_status', 'return' => 'id'));
+      $foundCaseStatus = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $this->caseStatusOptionGroupId, 'is_active' => 1));
       foreach ($foundCaseStatus['values'] as $caseStatus) {
         if (in_array($caseStatus['name'], $requiredCaseStatus)) {
           $this->_validCaseStatus[$caseStatus['value']] = $caseStatus['name'];
