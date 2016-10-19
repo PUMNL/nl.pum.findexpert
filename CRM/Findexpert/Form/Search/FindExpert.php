@@ -43,6 +43,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_eduFieldOfStudyColumn = NULL;
   private $_phPrinsHistoryColumn = NULL;
 
+  // Group IDs of which contact should be a member of.
+  private $_candidateExpertGroupId = NULL;
+  private $_activeExpertGroupId = NULL;
+
   // properties for clauses, params, searchColumns and likes
   private $_whereClauses = array();
   private $_whereParams = array();
@@ -74,6 +78,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->setActivityStatus();
     $this->setValidCaseTypes();
     $this->setValidCaseStatus();
+    $this->setGroupIds();
 
     parent::__construct($formValues);
   }
@@ -277,6 +282,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   function from() {
     return "FROM civicrm_contact contact_a
+    INNER JOIN civicrm_group_contact ON civicrm_group_contact.contact_id = contact_a.id
     LEFT JOIN pum_expert_main_sector main ON contact_a.id = main.contact_id
     LEFT JOIN pum_expert_other_sector other ON contact_a.id = other.contact_id
     LEFT JOIN pum_expert_areas_expertise areas ON contact_a.id = areas.contact_id
@@ -740,6 +746,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * Method to set the initial where clauses that apply to each instance
    */
   private function addInitialWhereClauses() {
+    $this->_whereClauses[] = 'contact_a.is_deleted = "0"';
     $this->_whereClauses[] = '(contact_a.contact_sub_type LIKE %1)';
     $this->_whereParams[1] = array('%Expert%', 'String');
     $this->_whereClauses[] = '(contact_a.is_deceased = %2)';
@@ -747,7 +754,11 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereClauses[] = '(exp.'.$this->_expStatusColumn.' NOT IN(%3, %4))';
     $this->_whereParams[3] = array('Exit', 'String');
     $this->_whereParams[4] = array('Suspended', 'String');
-    $this->_whereIndex = 4;
+
+    $this->_whereClauses[] = '((civicrm_group_contact.group_id = %5 OR civicrm_group_contact.group_id = %6) AND civicrm_group_contact.status = "Added")';
+    $this->_whereParams[5] = array($this->_activeExpertGroupId, 'Integer');
+    $this->_whereParams[6] = array($this->_candidateExpertGroupId, 'Integer');
+    $this->_whereIndex = 6;
   }
 
   /**
@@ -834,5 +845,14 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     } catch (CiviCRM_API3_Exception $ex) {
       throw new Exception('Could not find option group for case status in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
     }
+  }
+
+  /**
+   * Method to set the group ids. This group ids is used to find only people who
+   * are member of one of those groups.
+   */
+  private function setGroupIds() {
+    $this->_activeExpertGroupId = civicrm_api3('Group', 'getvalue', array('name' => 'Active_Expert_48', 'return' => 'id'));
+    $this->_candidateExpertGroupId = civicrm_api3('Group', 'getvalue', array('name' => 'Candidate_Expert_51', 'return' => 'id'));
   }
 }
