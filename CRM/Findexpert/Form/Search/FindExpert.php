@@ -21,10 +21,12 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_educationCustomGroupTable = NULL;
   private $_expertDataCustomGroupTable = NULL;
   private $_languageCustomGroupTable = NULL;
+  private $_prinsHistoryCustomGroupTable = NULL;
   private $_workHistoryCustomGroupId = NULL;
   private $_educationCustomGroupId = NULL;
   private $_expertDataCustomGroupId = NULL;
   private $_languageCustomGroupId = NULL;
+  private $_prinsHistoryCustomGroupId = NULL;
 
   // custom field column names needed
   private $_whNameOfOrganizationColumn = NULL;
@@ -39,6 +41,11 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_expSideActivitiesColumn = NULL;
   private $_eduNameInstitutionColumn = NULL;
   private $_eduFieldOfStudyColumn = NULL;
+  private $_phPrinsHistoryColumn = NULL;
+
+  // Group IDs of which contact should be a member of.
+  private $_candidateExpertGroupId = NULL;
+  private $_activeExpertGroupId = NULL;
 
   // properties for clauses, params, searchColumns and likes
   private $_whereClauses = array();
@@ -54,6 +61,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   // properties for valid case types and case status for latest main activity
   private $_validCaseTypes = array();
   private $_validCaseStatus = array();
+
+  private $caseStatusOptionGroupId;
   
   /**
    * CRM_Findexpert_Form_Search_FindExpert constructor.
@@ -69,6 +78,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->setActivityStatus();
     $this->setValidCaseTypes();
     $this->setValidCaseStatus();
+    $this->setGroupIds();
 
     parent::__construct($formValues);
   }
@@ -91,6 +101,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $form->add('select', 'expertise_id', ts('Areas(s) of Expertise'), $areasOfExpertiseList, FALSE,
       array('id' => 'expertise_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
     );
+    $form->assign('areas_of_expertise_list', json_encode($this->getAreasOfExpertiseListByParentId()));
 
     $form->add('select', 'generic_id', ts('Generic Skill(s)'), $this->_genericSkillsList, FALSE,
       array('id' => 'generic_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
@@ -155,6 +166,27 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       }
     }
     asort($result);
+    return $result;
+  }
+
+  /**
+   * Method to get list of areas of expertise. Initially all, jQuery in tpl will
+   * determine what will be available based on selected sectors
+   *
+   * @return array
+   * @access private
+   */
+  private function getAreasOfExpertiseListByParentId() {
+    $result = array();
+    $areas = civicrm_api3('Segment', 'Get', array());
+    foreach ($areas['values'] as $areaId => $area) {
+      if (!empty($area['parent_id'])) {
+        $result[$area['parent_id']][] = array(
+          'label' => $area['label'],
+          'id' => $areaId,
+        );
+      }
+    }
     return $result;
   }
 
@@ -250,13 +282,15 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   function from() {
     return "FROM civicrm_contact contact_a
+    INNER JOIN civicrm_group_contact ON civicrm_group_contact.contact_id = contact_a.id
     LEFT JOIN pum_expert_main_sector main ON contact_a.id = main.contact_id
     LEFT JOIN pum_expert_other_sector other ON contact_a.id = other.contact_id
     LEFT JOIN pum_expert_areas_expertise areas ON contact_a.id = areas.contact_id
     LEFT JOIN ".$this->_educationCustomGroupTable." edu ON contact_a.id = edu.entity_id
     LEFT JOIN ".$this->_expertDataCustomGroupTable." exp ON contact_a.id = exp.entity_id
     LEFT JOIN ".$this->_languageCustomGroupTable." ll ON contact_a.id = ll.entity_id
-    LEFT JOIN ".$this->_workHistoryCustomGroupTable." wh ON contact_a.id = wh.entity_id";
+    LEFT JOIN ".$this->_workHistoryCustomGroupTable." wh ON contact_a.id = wh.entity_id
+    LEFT JOIN ".$this->_prinsHistoryCustomGroupTable." ph ON contact_a.id = ph.entity_id";
   }
 
   /**
@@ -294,11 +328,26 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    */
   private function addCountriesVisitedWhereClause() {
     if (isset($this->_formValues['countries_visited'])) {
+      $countries = CRM_Core_PseudoConstant::country();
       $clauses = array();
       foreach ($this->_formValues['countries_visited'] as $countryVisitedId) {
         $this->_whereIndex++;
         $this->_whereParams[$this->_whereIndex] = array('%'.$countryVisitedId.'%', 'String');
         $clauses[] = 'wh.'.$this->_whCountriesVisitedColumn.' LIKE %'.$this->_whereIndex;
+
+        /**
+         * Issue #3460
+         * Also search in Prins History for visited countries.
+         */
+        if (isset($countries[$countryVisitedId])) {
+          $countryName = $countries[$countryVisitedId];
+          $this->_whereIndex++;
+          $this->_whereParams[$this->_whereIndex] = array(
+            '%Country: %' . $countryName . '%',
+            'String'
+          );
+          $clauses[] = 'ph.' . $this->_phPrinsHistoryColumn . ' LIKE %' . $this->_whereIndex;
+        }
       }
       if (!empty($clauses)) {
         $this->_whereClauses[] = '('.implode(' OR ', $clauses).')';
@@ -424,7 +473,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $this->_whereParams[$this->_whereIndex] = array($expertiseId, 'Integer');
       }
       if (!empty($expertiseIds)) {
-        $this->_whereClauses[] = '(areas.segment_id IN('.implode(', ', $expertiseIds).'))';
+        $this->_whereClauses[] = '(areas.segment_id IN('.implode(', ', $expertiseIds).') AND areas.is_active = 1 AND (areas.start_date IS NULL OR areas.start_date < NOW()) AND (areas.end_date IS NULL OR areas.end_date > NOW()))';
       }
     }
   }
@@ -441,7 +490,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
         $this->_whereParams[$this->_whereIndex] = array($sectorId, 'Integer');
       }
       if (!empty($sectorIds)) {
-        $this->_whereClauses[] = '(main.segment_id IN('.implode(', ', $sectorIds).') OR other.segment_id IN('.implode(', ', $sectorIds).'))';
+        $this->_whereClauses[] = '(
+          (main.segment_id IN('.implode(', ', $sectorIds).') AND main.is_active = 1 AND (main.start_date IS NULL OR main.start_date < NOW()) AND (main.end_date IS NULL OR main.end_date > NOW()) )
+          OR (other.segment_id IN('.implode(', ', $sectorIds).') AND other.is_active = 1 AND (other.start_date IS NULL OR other.start_date < NOW()) AND (other.end_date IS NULL OR other.end_date > NOW()) )
+          )';
       }
     }
   }
@@ -489,17 +541,19 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     // joined with case data of the right case type and status
     try {
       $expertRelationshipTypeId = civicrm_api3('RelationshipType', 'Getvalue', array('name_a_b' => 'Expert', 'return' => 'id'));
-      $query = "SELECT cc.subject 
+      $query = "SELECT CONCAT(cc.subject, ' (', status.label, ')') 
         FROM civicrm_relationship rel 
         JOIN civicrm_case cc ON rel.case_id = cc.id
         LEFT JOIN civicrm_value_main_activity_info main ON rel.case_id = main.entity_id
-        WHERE rel.relationship_type_id = %1 AND rel.contact_id_b = %2 AND cc.is_deleted = %3";
+        LEFT JOIN civicrm_option_value status ON cc.status_id = status.value AND status.option_group_id = %1
+        WHERE rel.relationship_type_id = %2 AND rel.contact_id_b = %3 AND cc.is_deleted = %4";
         $params = array(
-          1 => array($expertRelationshipTypeId, 'Integer'),
-          2 => array($contactId, 'Integer'),
-          3 => array(0, 'Integer')
+          1 => array($this->caseStatusOptionGroupId, 'Integer'),
+          2 => array($expertRelationshipTypeId, 'Integer'),
+          3 => array($contactId, 'Integer'),
+          4 => array(0, 'Integer')
         );
-      $index = 3;
+      $index = 4;
       // set where clauses for case status
       if (!empty($this->_validCaseStatus)) {
         $statusValues = array();
@@ -620,6 +674,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       array('name' => 'expert_data', 'property' => '_expertData'),
       array('name' => 'Languages', 'property' => '_language'),
       array('name' => 'Workhistory', 'property' => '_workHistory'),
+      array('name' => 'prins_history', 'property' => '_prinsHistory'),
     );
     foreach ($customGroups as $customGroupData) {
       try {
@@ -681,12 +736,17 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whCountriesVisitedColumn = civicrm_api3('CustomField', 'Getvalue', array(
       'custom_group_id' => $this->_workHistoryCustomGroupId, 'name' => 'Countries_visited_in_relation_to_the_job',
       'return' => 'column_name'));
+
+    $this->_phPrinsHistoryColumn = civicrm_api3('CustomField', 'Getvalue', array(
+      'custom_group_id' => $this->_prinsHistoryCustomGroupId, 'name' => 'prins_history',
+      'return' => 'column_name'));
   }
 
   /**
    * Method to set the initial where clauses that apply to each instance
    */
   private function addInitialWhereClauses() {
+    $this->_whereClauses[] = 'contact_a.is_deleted = "0"';
     $this->_whereClauses[] = '(contact_a.contact_sub_type LIKE %1)';
     $this->_whereParams[1] = array('%Expert%', 'String');
     $this->_whereClauses[] = '(contact_a.is_deceased = %2)';
@@ -694,7 +754,11 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereClauses[] = '(exp.'.$this->_expStatusColumn.' NOT IN(%3, %4))';
     $this->_whereParams[3] = array('Exit', 'String');
     $this->_whereParams[4] = array('Suspended', 'String');
-    $this->_whereIndex = 4;
+
+    $this->_whereClauses[] = '((civicrm_group_contact.group_id = %5 OR civicrm_group_contact.group_id = %6) AND civicrm_group_contact.status = "Added")';
+    $this->_whereParams[5] = array($this->_activeExpertGroupId, 'Integer');
+    $this->_whereParams[6] = array($this->_candidateExpertGroupId, 'Integer');
+    $this->_whereIndex = 6;
   }
 
   /**
@@ -769,10 +833,10 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @throws Exception when no option group case status found
    */
   private function setValidCaseStatus() {
-    $requiredCaseStatus = array('Completed', 'Debriefing', 'Execution', 'Matching', 'Preparation');
+    $requiredCaseStatus = array('Execution', 'Matching', 'Preparation');
     try {
-      $caseStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_status', 'return' => 'id'));
-      $foundCaseStatus = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $caseStatusOptionGroupId, 'is_active' => 1));
+      $this->caseStatusOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', array('name' => 'case_status', 'return' => 'id'));
+      $foundCaseStatus = civicrm_api3('OptionValue', 'Get', array('option_group_id' => $this->caseStatusOptionGroupId, 'is_active' => 1));
       foreach ($foundCaseStatus['values'] as $caseStatus) {
         if (in_array($caseStatus['name'], $requiredCaseStatus)) {
           $this->_validCaseStatus[$caseStatus['value']] = $caseStatus['name'];
@@ -781,5 +845,14 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     } catch (CiviCRM_API3_Exception $ex) {
       throw new Exception('Could not find option group for case status in '.__METHOD__.', error from API OptionGroup Getvalue: '.$ex->getMessage());
     }
+  }
+
+  /**
+   * Method to set the group ids. This group ids is used to find only people who
+   * are member of one of those groups.
+   */
+  private function setGroupIds() {
+    $this->_activeExpertGroupId = civicrm_api3('Group', 'getvalue', array('name' => 'Active_Expert_48', 'return' => 'id'));
+    $this->_candidateExpertGroupId = civicrm_api3('Group', 'getvalue', array('name' => 'Candidate_Expert_51', 'return' => 'id'));
   }
 }
