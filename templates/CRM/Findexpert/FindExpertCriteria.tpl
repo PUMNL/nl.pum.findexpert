@@ -63,44 +63,10 @@
               <label for="expertise-select">{ts}Area(s) of Expertise{/ts}</label>
             </div>
             <div class="content" id="expertise-select">
+              <div>To select multiple area's of expertise: Hold CTRL-key</div>
               {$form.expertise_id.html}
-              {literal}
-                <script type="text/javascript">
-                    cj(function() {
-                        var objAreaOfExpertisesByParent = {/literal}{$areas_of_expertise_list}{literal};
-                        cj("select#expertise_id").crmasmSelect({
-                            respectParents: true
-                        });
-
-                        /*
-                        * Only show areas of expertises of selected sectors.
-                        */
-                        var expertise_id_select = cj('select#expertise_id').parent('.crmasmContainer').children('select.crmasmSelect');
-                        var allAreaOfExpertiseOptions = expertise_id_select.children("option").clone();
-                        cj("select#sector_id").on('change', function() {
-                            var selectedSectors = cj("select#sector_id").val();
-                            expertise_id_select.children("option").remove();
-                            expertise_id_select.append(allAreaOfExpertiseOptions.clone());
-                            if (selectedSectors) {
-                                expertise_id_select.children("option:first").attr('selected','selected');
-                                expertise_id_select.children("option").addClass('to-be-removed');
-                                expertise_id_select.children("option:selected").removeClass('to-be-removed');
-                                for (var i = 0; i < selectedSectors.length; i++) {
-                                    var sector_id = selectedSectors[i];
-                                    for (var j = 0; j < objAreaOfExpertisesByParent[sector_id].length; j++) {
-                                        var area_id = objAreaOfExpertisesByParent[sector_id][j].id;
-                                        expertise_id_select.children("option[value="+area_id+"]").removeClass('to-be-removed');
-                                    }
-                                }
-                                expertise_id_select.children("option.to-be-removed").remove();
-                            } else {
-                                expertise_id_select.children("option:first").attr('selected','selected');
-                            }
-                        });
-                    });
-                </script>
-              {/literal}
             </div>
+            <div class="content" id="deselect-all-expertise" style="cursor: pointer;"><a>Deselect all area(s) of expertise</a></div>
             <div class="clear"></div>
           </div>
         {/if}
@@ -196,6 +162,51 @@
 {/strip}
 {literal}
   <script type="text/javascript">
+    var objAreaOfExpertisesByParent = {/literal}{$areas_of_expertise_list}{literal};
+    var expertise_id_select = cj('select#expertise_id');
+    var allAreaOfExpertiseOptions = expertise_id_select.children("option").clone();
+
+    function update_aoe_list(){
+      var selectedSectors = cj("select#sector_id").val();
+      expertise_id_select.empty();
+      expertise_id_select.append(allAreaOfExpertiseOptions.clone());
+
+      expertise_id_select.children("option").hide();
+
+      if(selectedSectors == null || typeof selectedSectors === 'undefined'){
+        expertise_id_select.children("option").show();
+      } else {
+        for (var i = 0; i < selectedSectors.length; i++) {
+          var sector_id = selectedSectors[i];
+
+          if(objAreaOfExpertisesByParent[sector_id].length > 0){
+            for (var j = 0; j < objAreaOfExpertisesByParent[sector_id].length; j++) {
+              var area_id = objAreaOfExpertisesByParent[sector_id][j].id;
+              expertise_id_select.children("option[value="+area_id+"]").show();
+            }
+          }
+        }
+      }
+    }
+
+    cj(document).ready(function(){
+      cj('select#sector_id').change(function(){
+        update_aoe_list();
+      });
+
+      cj('.crmasmListItemRemove').click(function(){
+        cj(this).parent().remove();
+        update_aoe_list();
+      });
+      cj('#deselect-all-expertise').click(function(){
+        cj('select#expertise_id').val([]);
+      });
+
+      cj('.crm-accordion-header').click(function(){
+        update_aoe_list();
+      });
+    });
+
     cj(function() {
       cj().crmAccordions();
     });

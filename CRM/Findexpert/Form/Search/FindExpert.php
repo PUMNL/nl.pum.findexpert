@@ -63,7 +63,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
   private $_validCaseStatus = array();
 
   private $caseStatusOptionGroupId;
-  
+
   /**
    * CRM_Findexpert_Form_Search_FindExpert constructor.
    * @param $formValues
@@ -99,7 +99,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
 
     $areasOfExpertiseList = $this->getAreasOfExpertiseList();
     $form->add('select', 'expertise_id', ts('Areas(s) of Expertise'), $areasOfExpertiseList, FALSE,
-      array('id' => 'expertise_id', 'multiple' => 'multiple', 'title' => ts('- select -'))
+      array('id' => 'expertise_id', 'multiple' => 'multiple', 'title' => ts('- select -'),'size'=>10)
     );
     $form->assign('areas_of_expertise_list', json_encode($this->getAreasOfExpertiseListByParentId()));
 
@@ -115,8 +115,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $form->add('text', 'overall_string', ts('Search Expert Data for'), array(
       'size' => CRM_Utils_Type::HUGE, 'maxlength' =>  255));
 
-    $form->add('select', 'countries_visited', ts('Countries Visited in Work History'), 
-      CRM_Core_PseudoConstant::country(), FALSE, array('id' => 'countries_visited', 
+    $form->add('select', 'countries_visited', ts('Countries Visited in Work History'),
+      CRM_Core_PseudoConstant::country(), FALSE, array('id' => 'countries_visited',
         'multiple' => 'multiple', 'title' => ts('- select -'))
     );
 
@@ -127,7 +127,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $form->addRadio('ignore_cases', ts('Ignore capitals?'), $allCases, NULL, '<br />', TRUE);
     $defaults['ignore_cases'] = 1;
     $form->setDefaults($defaults);
-    
+
     $form->assign('elements', array('sector_id', 'expertise_id', 'generic_id', 'language_id',
       'overall_string', 'countries_visited'));
     $form->addButtons(array(array('type' => 'refresh', 'name' => ts('Search'), 'isDefault' => TRUE,),));
@@ -270,7 +270,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
    * @return string, sql fragment with SELECT arguments
    */
   function select() {
-    return "DISTINCT(contact_a.id) AS contact_id, contact_a.display_name AS display_name, 
+    return "DISTINCT(contact_a.id) AS contact_id, contact_a.display_name AS display_name,
     main.main_sector, exp.".$this->_expStatusColumn." AS expert_status, NULL AS restrictions, NULL as last_main,
     NULL as main_count";
   }
@@ -389,7 +389,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
 
   /**
    * Method for multiple string elements in overall search
-   * 
+   *
    * @param $operator
    */
   private function stringMultipleClauses($operator) {
@@ -541,8 +541,8 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     // joined with case data of the right case type and status
     try {
       $expertRelationshipTypeId = civicrm_api3('RelationshipType', 'Getvalue', array('name_a_b' => 'Expert', 'return' => 'id'));
-      $query = "SELECT CONCAT(cc.subject, ' (', status.label, ')') 
-        FROM civicrm_relationship rel 
+      $query = "SELECT CONCAT(cc.subject, ' (', status.label, ')')
+        FROM civicrm_relationship rel
         JOIN civicrm_case cc ON rel.case_id = cc.id
         LEFT JOIN civicrm_value_main_activity_info main ON rel.case_id = main.entity_id
         LEFT JOIN civicrm_option_value status ON cc.status_id = status.value AND status.option_group_id = %1
@@ -627,7 +627,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       } catch (CiviCRM_API3_Exception $ex) {}
     } catch (CiviCRM_API3_Exception $ex) {
       throw new Exception('Could not find an option group for level languages with name
-      level_432_20140806134147 in extension nl.pum.findexpert ('.__METHOD__.'), contact your 
+      level_432_20140806134147 in extension nl.pum.findexpert ('.__METHOD__.'), contact your
       system administrator. Error from API OptionGroup Getvalue: '.$ex->getMessage()
         .' with params '.implode('; ', $levelParams));
     }
@@ -636,7 +636,7 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
       $languageOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', $languageParams);
     } catch (CiviCRM_API3_Exception $ex) {
       throw new Exception('Could not find an option group for expert languages with name
-      language_20140716104058 in extension nl.pum.findexpert ('.__METHOD__.'), contact your 
+      language_20140716104058 in extension nl.pum.findexpert ('.__METHOD__.'), contact your
       system administrator. Error from API OptionGroup Getvalue: '.$ex->getMessage()
         .' with params '.implode('; ', $languageParams));
     }
