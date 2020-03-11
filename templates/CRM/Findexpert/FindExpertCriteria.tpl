@@ -115,7 +115,7 @@
               <div class="icon inform-icon"></div>
               {ts}You can search the expert data on a string.
               The default behaviour is it will search for everything you enter in this field. So if you enter <em>ecological farm</em> it will search for that complete text string.<br />
-              If you want to search for <em>ecological</em> OR <em>farm</em> you should put brackets around your search string and separate the words with comma's. The field should now have the input <em>(ecological, farm)</em>.</br>
+              If you want to search for <em>ecological</em> OR <em>farm</em> you should put brackets around your search string and separate the words with comma's. The field should now have the input <em>(ecological, farm)</em>.<br />
               If you want to search for <em>ecological</em> AND <em>farm</em> as separate words you should put curly brackets around your search string and separate the words with comma's. The field should now have the input <em>{literal}{ecological, farm}{/literal}</em>.
               {/ts}
             </div>
@@ -166,23 +166,59 @@
     var expertise_id_select = cj('select#expertise_id');
     var allAreaOfExpertiseOptions = expertise_id_select.children("option").clone();
 
+    //Hide function does not work correctly in IE: https://stackoverflow.com/questions/20373558/options-with-displaynone-not-hidden-in-ie
+    //So added fix to use attribute hidden
     function update_aoe_list(){
       var selectedSectors = cj("select#sector_id").val();
       expertise_id_select.empty();
       expertise_id_select.append(allAreaOfExpertiseOptions.clone());
 
-      expertise_id_select.children("option").hide();
+      expertise_id_select.children("option").attr('disabled', 'disabled').attr( "style", "display: none;").hide();
+
+      expertise_id_select.children("option").each(function(index, val){
+          if (cj(this).is('option') && (!cj(this).parent().is('span'))) {
+              cj(this).wrap((navigator.appName == 'Microsoft Internet Explorer') ? '<span>' : null).hide();
+          }
+      });
 
       if(selectedSectors == null || typeof selectedSectors === 'undefined'){
-        expertise_id_select.children("option").show();
+        cj(expertise_id_select).each(function(index, val) {
+          if(navigator.appName == 'Microsoft Internet Explorer') {
+              if (this.nodeName.toUpperCase() === 'OPTION') {
+                  var span = cj(this).parent();
+                  var opt = this;
+                  if(cj(this).parent().is('span')) {
+                      cj(opt).show();
+                      cj(span).replaceWith(opt);
+                  }
+              }
+          } else {
+              expertise_id_select.children("option").attr( "style", "display: block !important;").removeAttr('disabled').show(); //all other browsers use standard .show()
+          }
+        });
+
       } else {
         for (var i = 0; i < selectedSectors.length; i++) {
           var sector_id = selectedSectors[i];
 
           if(objAreaOfExpertisesByParent[sector_id].length > 0){
+
             for (var j = 0; j < objAreaOfExpertisesByParent[sector_id].length; j++) {
               var area_id = objAreaOfExpertisesByParent[sector_id][j].id;
-              expertise_id_select.children("option[value="+area_id+"]").show();
+
+              if(navigator.appName == 'Microsoft Internet Explorer') {
+                if (this.nodeName.toUpperCase() === 'OPTION') {
+                    var span = cj(this).parent();
+                    var opt = this;
+                    if(cj(this).parent().is('span')) {
+                        cj(opt).show();
+                        cj(span).replaceWith(opt);
+                    }
+                }
+              } else {
+                  expertise_id_select.children("option[value="+area_id+"]").attr( "style", "display: block !important;").removeAttr('disabled').show(); //all other browsers use standard .show()
+              }
+
             }
           }
         }
@@ -190,7 +226,11 @@
     }
 
     cj(document).ready(function(){
+      update_aoe_list();
       cj('select#sector_id').change(function(){
+        update_aoe_list();
+      });
+      cj('ul.crmasmList').change(function(){
         update_aoe_list();
       });
 

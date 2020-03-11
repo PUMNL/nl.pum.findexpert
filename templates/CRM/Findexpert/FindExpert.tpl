@@ -65,8 +65,7 @@
           {/foreach}
           <td>
             <span>
-              <a href="{crmURL p='civicrm/contact/view' q="reset=1&cid=`$row.contact_id`"}"
-                 class="action-item action-item-first" title="View Contact Details">View</a>
+              <a href="{crmURL p='civicrm/contact/view' q="reset=1&cid=`$row.contact_id`"}" class="action-item action-item-first" title="View Contact Details">View</a>
             </span>
           </td>
         </tr>
