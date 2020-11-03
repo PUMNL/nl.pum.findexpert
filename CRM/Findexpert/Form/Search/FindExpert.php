@@ -751,14 +751,12 @@ class CRM_Findexpert_Form_Search_FindExpert extends CRM_Contact_Form_Search_Cust
     $this->_whereParams[1] = array('%Expert%', 'String');
     $this->_whereClauses[] = '(contact_a.is_deceased = %2)';
     $this->_whereParams[2] = array(0, 'Integer');
-    $this->_whereClauses[] = '(exp.'.$this->_expStatusColumn.' NOT IN(%3, %4))';
+    $this->_whereClauses[] = '(exp.'.$this->_expStatusColumn.' NOT IN(%3))';
     $this->_whereParams[3] = array('Exit', 'String');
-    $this->_whereParams[4] = array('Suspended', 'String');
-
-    $this->_whereClauses[] = '((civicrm_group_contact.group_id = %5 OR civicrm_group_contact.group_id = %6) AND civicrm_group_contact.status = "Added")';
-    $this->_whereParams[5] = array($this->_activeExpertGroupId, 'Integer');
-    $this->_whereParams[6] = array($this->_candidateExpertGroupId, 'Integer');
-    $this->_whereIndex = 6;
+    $this->_whereClauses[] = '((civicrm_group_contact.group_id = %4 OR civicrm_group_contact.group_id = %5) AND civicrm_group_contact.status = "Added")';
+    $this->_whereParams[4] = array($this->_activeExpertGroupId, 'Integer');
+    $this->_whereParams[5] = array($this->_candidateExpertGroupId, 'Integer');
+    $this->_whereIndex = 5;
   }
 
   /**
